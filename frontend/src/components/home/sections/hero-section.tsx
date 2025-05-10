@@ -149,13 +149,12 @@ export function HeroSection() {
           currentUsage: error.detail.currentUsage as number | undefined,
           limit: error.detail.limit as number | undefined,
           subscription: error.detail.subscription || {
-            price_id: config.SUBSCRIPTION_TIERS.FREE.priceId, // Default Free
+            price_id: config.SUBSCRIPTION_TIERS.FREE.priceId,
             plan_name: 'Free',
           },
         });
-        // Don't show toast for billing errors
       } else {
-        // Handle other errors (e.g., network, other API errors)
+        // Handle other errors
         const isConnectionError =
           error instanceof TypeError &&
           error.message.includes('Failed to fetch');
@@ -174,14 +173,13 @@ export function HeroSection() {
   const handleSubmit = async (e?: FormEvent) => {
     if (e) {
       e.preventDefault();
-      e.stopPropagation(); // Stop event propagation to prevent dialog closing
+      e.stopPropagation();
     }
 
     if (!inputValue.trim() || isSubmitting) return;
 
     // If user is not logged in, save prompt and show auth dialog
     if (!user && !isLoading) {
-      // Save prompt to localStorage BEFORE showing the dialog
       localStorage.setItem(PENDING_PROMPT_KEY, inputValue.trim());
       setAuthDialogOpen(true);
       return;
@@ -194,8 +192,8 @@ export function HeroSection() {
   // Handle Enter key press
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault(); // Prevent default form submission
-      e.stopPropagation(); // Stop event propagation
+      e.preventDefault();
+      e.stopPropagation();
       handleSubmit();
     }
   };
@@ -204,16 +202,9 @@ export function HeroSection() {
   const handleSignIn = async (prevState: any, formData: FormData) => {
     setAuthError(null);
     try {
-      // Implement sign in logic here
       const email = formData.get('email') as string;
       const password = formData.get('password') as string;
-
-      // Add the returnUrl to the form data for proper redirection
       formData.append('returnUrl', '/dashboard');
-
-      // Call your authentication function here
-
-      // Return any error state
       return { message: 'Invalid credentials' };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -227,57 +218,43 @@ export function HeroSection() {
   return (
     <section id="hero" className="w-full relative overflow-hidden">
       <div className="relative flex flex-col items-center w-full px-6">
-        {/* Left side flickering grid with gradient fades */}
+        {/* Grid backgrounds */}
         <div className="absolute left-0 top-0 h-[600px] md:h-[800px] w-1/3 -z-10 overflow-hidden">
-          {/* Horizontal fade from left to right */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background z-10" />
-
-          {/* Vertical fade from top */}
           <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-background via-background/90 to-transparent z-10" />
-
-          {/* Vertical fade to bottom */}
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background via-background/90 to-transparent z-10" />
-
           <FlickeringGrid
             className="h-full w-full"
             squareSize={mounted && tablet ? 2 : 2.5}
             gridGap={mounted && tablet ? 2 : 2.5}
             color="var(--secondary)"
             maxOpacity={0.4}
-            flickerChance={isScrolling ? 0.01 : 0.03} // Low flickering when not scrolling
+            flickerChance={isScrolling ? 0.01 : 0.03}
           />
         </div>
 
-        {/* Right side flickering grid with gradient fades */}
         <div className="absolute right-0 top-0 h-[600px] md:h-[800px] w-1/3 -z-10 overflow-hidden">
-          {/* Horizontal fade from right to left */}
           <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-background z-10" />
-
-          {/* Vertical fade from top */}
           <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-background via-background/90 to-transparent z-10" />
-
-          {/* Vertical fade to bottom */}
           <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-background via-background/90 to-transparent z-10" />
-
           <FlickeringGrid
             className="h-full w-full"
             squareSize={mounted && tablet ? 2 : 2.5}
             gridGap={mounted && tablet ? 2 : 2.5}
             color="var(--secondary)"
             maxOpacity={0.4}
-            flickerChance={isScrolling ? 0.01 : 0.03} // Low flickering when not scrolling
+            flickerChance={isScrolling ? 0.01 : 0.03}
           />
         </div>
 
-        {/* Center content background with rounded bottom */}
-        <div className="absolute inset-x-1/4 top-0 h-[600px] md:h-[800px] -z-20 bg-background rounded-b-xl"></div>
+        {/* Beta badge styling */}
+        <div className="absolute top-6 left-6 z-20">
+          <div className="px-3 py-1 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 text-white text-xs font-bold flex items-center">
+            <span className="animate-pulse mr-1">•</span> BETA
+          </div>
+        </div>
 
         <div className="relative z-10 pt-32 max-w-3xl mx-auto h-full w-full flex flex-col gap-10 items-center justify-center">
-          {/* <p className="border border-border bg-accent rounded-full text-sm h-8 px-3 flex items-center gap-2">
-            {hero.badgeIcon}
-            {hero.badge}
-          </p> */}
-
           <Link
             href={hero.githubUrl}
             target="_blank"
@@ -307,20 +284,23 @@ export function HeroSection() {
               </svg>
             </span>
           </Link>
+          
           <div className="flex flex-col items-center justify-center gap-5">
             <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tighter text-balance text-center">
-              <span className="text-secondary">Suna</span>
-              <span className="text-primary">, your AI Employee.</span>
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-500">
+                Rand AI
+              </span>
+              <span className="text-primary">, your next-gen AI assistant</span>
             </h1>
             <p className="text-base md:text-lg text-center text-muted-foreground font-medium text-balance leading-relaxed tracking-tight">
               {hero.description}
             </p>
           </div>
+          
           <div className="flex items-center w-full max-w-xl gap-2 flex-wrap justify-center">
             <form className="w-full relative" onSubmit={handleSubmit}>
-              {/* ChatGPT-like input with glow effect */}
               <div className="relative z-10">
-                <div className="flex items-center rounded-full border border-border bg-background/80 backdrop-blur px-4 shadow-lg transition-all duration-200 hover:border-secondary/50 focus-within:border-secondary/50 focus-within:shadow-[0_0_15px_rgba(var(--secondary),0.3)]">
+                <div className="flex items-center rounded-full border border-border bg-background/80 backdrop-blur px-4 shadow-lg transition-all duration-200 hover:border-purple-500/50 focus-within:border-purple-500/50 focus-within:shadow-[0_0_15px_rgba(124,58,237,0.3)]">
                   <input
                     type="text"
                     value={inputValue}
@@ -334,26 +314,26 @@ export function HeroSection() {
                     type="submit"
                     className={`rounded-full p-2 md:p-3 transition-all duration-200 ${
                       inputValue.trim()
-                        ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-500 text-white hover:opacity-90'
                         : 'bg-muted text-muted-foreground'
                     }`}
                     disabled={!inputValue.trim() || isSubmitting}
                     aria-label="Submit"
                   >
                     {isSubmitting ? (
-                      <div className="h-4 md:h-5 w-4 md:w-5 border-2 border-secondary-foreground border-t-transparent rounded-full animate-spin" />
+                      <div className="h-4 md:h-5 w-4 md:w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <ArrowRight className="size-4 md:size-5" />
                     )}
                   </button>
                 </div>
               </div>
-              {/* Subtle glow effect */}
-              <div className="absolute -bottom-4 inset-x-0 h-6 bg-secondary/20 blur-xl rounded-full -z-10 opacity-70"></div>
+              <div className="absolute -bottom-4 inset-x-0 h-6 bg-purple-500/20 blur-xl rounded-full -z-10 opacity-70"></div>
             </form>
           </div>
         </div>
       </div>
+      
       <div className="mb-10 max-w-4xl mx-auto">
         <HeroVideoSection />
       </div>
@@ -365,34 +345,25 @@ export function HeroSection() {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle className="text-xl font-medium">
-                Sign in to continue
+                Sign in to Rand AI
               </DialogTitle>
-              {/* <button 
-                onClick={() => setAuthDialogOpen(false)}
-                className="rounded-full p-1 hover:bg-muted transition-colors"
-              >
-                <X className="h-4 w-4 text-muted-foreground" />
-              </button> */}
             </div>
             <DialogDescription className="text-muted-foreground">
-              Sign in or create an account to talk with Suna
+              Continue with your account to access Rand AI
             </DialogDescription>
           </DialogHeader>
 
-          {/* Auth error message */}
           {authError && (
-            <div className="mb-4 p-3 rounded-lg flex items-center gap-3 bg-secondary/10 border border-secondary/20 text-secondary">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 text-secondary" />
+            <div className="mb-4 p-3 rounded-lg flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-500">
+              <AlertCircle className="h-5 w-5 flex-shrink-0" />
               <span className="text-sm font-medium">{authError}</span>
             </div>
           )}
 
-          {/* Google Sign In */}
           <div className="w-full">
             <GoogleSignIn returnUrl="/dashboard" />
           </div>
 
-          {/* Divider */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border"></div>
@@ -404,7 +375,6 @@ export function HeroSection() {
             </div>
           </div>
 
-          {/* Sign in form */}
           <form className="space-y-4">
             <div>
               <Input
@@ -431,7 +401,7 @@ export function HeroSection() {
             <div className="space-y-4 pt-4">
               <SubmitButton
                 formAction={handleSignIn}
-                className="w-full h-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md"
+                className="w-full h-12 rounded-full bg-gradient-to-r from-purple-600 to-blue-500 text-white hover:opacity-90 transition-all shadow-md"
                 pendingText="Signing in..."
               >
                 Sign in
@@ -460,17 +430,16 @@ export function HeroSection() {
           <div className="mt-4 text-center text-xs text-muted-foreground">
             By continuing, you agree to our{' '}
             <Link href="/terms" className="text-primary hover:underline">
-              Terms of Service
+              Terms
             </Link>{' '}
             and{' '}
             <Link href="/privacy" className="text-primary hover:underline">
-              Privacy Policy
+              Privacy
             </Link>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Add Billing Error Alert here */}
       <BillingErrorAlert
         message={billingError?.message}
         currentUsage={billingError?.currentUsage}

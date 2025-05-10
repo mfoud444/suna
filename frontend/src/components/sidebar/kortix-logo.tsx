@@ -15,13 +15,14 @@ export function KortixLogo() {
 
   return (
     <div className="flex h-6 w-6 items-center justify-center flex-shrink-0">
-      <Image
+      Rand AI
+      {/* <Image
         src="/kortix-symbol.svg"
         alt="Kortix"
         width={24}
         height={24}
         className={`${mounted && theme === 'dark' ? 'invert' : ''}`}
-      />
+      /> */}
     </div>
   );
 }
