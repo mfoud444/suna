@@ -407,11 +407,11 @@ async def start_agent(
         logger.info(f"Stopping existing agent run {active_run_id} for project {project_id}")
         await stop_agent_run(active_run_id)
 
-    try:
-        sandbox, sandbox_id, sandbox_pass = await get_or_create_project_sandbox(client, project_id)
-    except Exception as e:
-        logger.error(f"Failed to get/create sandbox for project {project_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to initialize sandbox: {str(e)}")
+    # try:
+    #     sandbox, sandbox_id, sandbox_pass = await get_or_create_project_sandbox(client, project_id)
+    # except Exception as e:
+    #     logger.error(f"Failed to get/create sandbox for project {project_id}: {str(e)}")
+    #     raise HTTPException(status_code=500, detail=f"Failed to initialize sandbox: {str(e)}")
 
     agent_run = await client.table('agent_runs').insert({
         "thread_id": thread_id, "status": "running",
@@ -431,7 +431,7 @@ async def start_agent(
     task = asyncio.create_task(
         run_agent_background(
             agent_run_id=agent_run_id, thread_id=thread_id, instance_id=instance_id,
-            project_id=project_id, sandbox=sandbox,
+            project_id=project_id, sandbox="sandbox",
             model_name=model_name,  # Already resolved above
             enable_thinking=body.enable_thinking, reasoning_effort=body.reasoning_effort,
             stream=body.stream, enable_context_manager=body.enable_context_manager

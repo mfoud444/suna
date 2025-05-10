@@ -57,8 +57,8 @@ async def run_agent(
 
     project_data = project.data[0]
     sandbox_info = project_data.get('sandbox', {})
-    if not sandbox_info.get('id'):
-        raise ValueError(f"No sandbox found for project {project_id}")
+    # if not sandbox_info.get('id'):
+    #     raise ValueError(f"No sandbox found for project {project_id}")
 
     # Initialize tools with project_id instead of sandbox object
     # This ensures each tool independently verifies it's operating on the correct project
