@@ -18,8 +18,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend/.env:/app/.env:ro
+    # volumes:
+    #   - ./backend/.env:/app/.env:ro
     environment:
       - ENV_MODE=local
       - REDIS_HOST=redis
