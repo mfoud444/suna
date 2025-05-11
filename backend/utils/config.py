@@ -115,7 +115,12 @@ class Configuration:
     OPENROUTER_API_KEY: Optional[str] = None
     OPENROUTER_API_BASE: Optional[str] = "https://openrouter.ai/api/v1"
     OR_SITE_URL: Optional[str] = "https://kortix.ai"
-    OR_APP_NAME: Optional[str] = "Kortix AI"    
+    OR_APP_NAME: Optional[str] = "Kortix AI"  
+    OLLAMA_API_BASE: Optional[str] = "http://localhost:11434" 
+    OLLAMA_API_KEY: Optional[str] = ''  
+    CUSTOM_API_BASE: Optional[str] = None
+    CUSTOM_API_KEY: Optional[str] = None
+    CUSTOM_API_MODEL: Optional[str] = None
     
     # AWS Bedrock credentials
     AWS_ACCESS_KEY_ID: Optional[str] = None

@@ -2,7 +2,7 @@
 LLM API interface for making calls to various language models.
 
 This module provides a unified interface for making API calls to different LLM providers
-(OpenAI, Anthropic, Groq, etc.) using LiteLLM. It includes support for:
+(OpenAI, Anthropic, Groq, Ollama, etc.) using LiteLLM. It includes support for:
 - Streaming responses
 - Tool calls and function calling
 - Retry logic with exponential backoff
@@ -37,7 +37,7 @@ class LLMRetryError(LLMError):
 
 def setup_api_keys() -> None:
     """Set up API keys from environment variables."""
-    providers = ['OPENAI', 'ANTHROPIC', 'GROQ', 'OPENROUTER']
+    providers = ['OPENAI', 'ANTHROPIC', 'GROQ', 'OPENROUTER', 'CUSTOM']
     for provider in providers:
         key = getattr(config, f'{provider}_API_KEY')
         if key:
@@ -63,6 +63,18 @@ def setup_api_keys() -> None:
         os.environ['AWS_REGION_NAME'] = aws_region
     else:
         logger.warning(f"Missing AWS credentials for Bedrock integration - access_key: {bool(aws_access_key)}, secret_key: {bool(aws_secret_key)}, region: {aws_region}")
+
+    # Set up Ollama API base if not already set
+    if config.OLLAMA_API_BASE:
+        os.environ['OLLAMA_API_BASE'] = config.OLLAMA_API_BASE
+        logger.debug(f"Set OLLAMA_API_BASE to {config.OLLAMA_API_BASE}")
+    # Set up Custom API base if configured
+    if config.CUSTOM_API_BASE:
+        os.environ['CUSTOM_API_BASE'] = config.CUSTOM_API_BASE
+        logger.debug(f"Set CUSTOM_API_BASE to {config.CUSTOM_API_BASE}")
+
+    else:
+        logger.warning("No OLLAMA_API_BASE configured - defaulting to http://localhost:11434")
 
 async def handle_error(error: Exception, attempt: int, max_attempts: int) -> None:
     """Handle API errors with appropriate delays and logging."""
@@ -123,7 +135,7 @@ def prepare_params(
         })
         logger.debug(f"Added {len(tools)} tools to API parameters")
 
-    # # Add Claude-specific headers
+    # Add Claude-specific headers
     if "claude" in model_name.lower() or "anthropic" in model_name.lower():
         params["extra_headers"] = {
             # "anthropic-beta": "max-tokens-3-5-sonnet-2024-07-15"
@@ -154,6 +166,41 @@ def prepare_params(
         if not model_id and "anthropic.claude-3-7-sonnet" in model_name:
             params["model_id"] = "arn:aws:bedrock:us-west-2:935064898258:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
             logger.debug(f"Auto-set model_id for Claude 3.7 Sonnet: {params['model_id']}")
+
+    # Add this to prepare_params() before the return statement
+    if model_name.startswith("custom/"):
+        logger.debug(f"Preparing Custom API parameters for model: {model_name}")
+        params["custom_llm_provider"] = "openai"  # Assuming OpenAI-compatible API
+        params["api_base"] = config.CUSTOM_API_BASE
+        if config.CUSTOM_API_KEY:
+            params["api_key"] = config.CUSTOM_API_KEY
+        # Remove the 'custom/' prefix from the model name
+        params["model"] = model_name.replace("custom/", "")
+        
+    # Add Ollama-specific parameters
+    if model_name.startswith("ollama/"):
+        logger.debug(f"Preparing Ollama parameters for model: {model_name}")
+        
+        # Ollama models don't need API keys but might need custom options
+        params["custom_llm_provider"] = "ollama"
+        # ollama_model_name = model_name.replace("ollama/", "")
+        # print(f"Ollama model name: {ollama_model_name}")
+        # params["model_name"]= ollama_model_name
+        params["api_base"] = config.OLLAMA_API_BASE
+        print(f"Ollama API base: {config.OLLAMA_API_BASE}")
+        
+        # Add options for Ollama models
+        options = {}
+        if temperature is not None:
+            options["temperature"] = temperature
+        if top_p is not None:
+            options["top_p"] = top_p
+        if max_tokens is not None:
+            options["num_predict"] = max_tokens
+            
+        if options:
+            params["options"] = options
+            logger.debug(f"Added Ollama options: {options}")
 
     # Apply Anthropic prompt caching (minimal implementation)
     # Check model name *after* potential modifications (like adding bedrock/ prefix)
@@ -235,7 +282,6 @@ def prepare_params(
         logger.info(f"Anthropic thinking enabled with reasoning_effort='{effort_level}'")
 
     return params
-
 async def make_llm_api_call(
     messages: List[Dict[str, Any]],
     model_name: str,
@@ -254,69 +300,82 @@ async def make_llm_api_call(
 ) -> Union[Dict[str, Any], AsyncGenerator]:
     """
     Make an API call to a language model using LiteLLM.
-
-    Args:
-        messages: List of message dictionaries for the conversation
-        model_name: Name of the model to use (e.g., "gpt-4", "claude-3", "openrouter/openai/gpt-4", "bedrock/anthropic.claude-3-sonnet-20240229-v1:0")
-        response_format: Desired format for the response
-        temperature: Sampling temperature (0-1)
-        max_tokens: Maximum tokens in the response
-        tools: List of tool definitions for function calling
-        tool_choice: How to select tools ("auto" or "none")
-        api_key: Override default API key
-        api_base: Override default API base URL
-        stream: Whether to stream the response
-        top_p: Top-p sampling parameter
-        model_id: Optional ARN for Bedrock inference profiles
-        enable_thinking: Whether to enable thinking
-        reasoning_effort: Level of reasoning effort
-
-    Returns:
-        Union[Dict[str, Any], AsyncGenerator]: API response or stream
-
-    Raises:
-        LLMRetryError: If API call fails after retries
-        LLMError: For other API-related errors
     """
-    # debug <timestamp>.json messages
-    logger.info(f"Making LLM API call to model: {model_name} (Thinking: {enable_thinking}, Effort: {reasoning_effort})")
+    logger.info(f"Making LLM API call to model: {model_name}")
     logger.info(f"📡 API Call: Using model {model_name}")
-    params = prepare_params(
-        messages=messages,
-        model_name=model_name,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        response_format=response_format,
-        tools=tools,
-        tool_choice=tool_choice,
-        api_key=api_key,
-        api_base=api_base,
-        stream=stream,
-        top_p=top_p,
-        model_id=model_id,
-        enable_thinking=enable_thinking,
-        reasoning_effort=reasoning_effort
-    )
+
+    # Check if this is a custom API call (no prefix but custom base configured)
+    use_custom_api = (
+        not any(model_name.startswith(prefix) 
+        for prefix in ["openai/", "anthropic/", "groq/", "ollama/", "bedrock/", "openrouter/"]
+    ) and config.CUSTOM_API_BASE)
+
+    # Prepare parameters based on provider type
+    if model_name.startswith("ollama/"):
+        params = {
+            "model": model_name,
+            "messages": messages,
+            "stream": stream,
+            "custom_llm_provider": "ollama",
+            "api_base": config.OLLAMA_API_BASE 
+        }
+    elif use_custom_api or model_name.startswith("custom/"):
+        print(f" 📡 📡 📡 📡Custom API configuration: {model_name}")
+        # Custom API configuration
+        params = {
+            "model": model_name.replace("custom/", ""),  # Remove custom/ prefix
+            "messages": messages,
+            "stream": stream,
+            "custom_llm_provider": "openai",  # Treat as OpenAI-compatible
+            "api_base": config.CUSTOM_API_BASE,
+           "timeout": 60,  # Add timeout
+            "max_retries": 2,  # Add retries
+            "verify_ssl": False  
+        #     "api_key": api_key or config.CUSTOM_API_KEY
+        }
+        
+        # Add standard parameters
+        if temperature is not None:
+            params["temperature"] = temperature
+        if max_tokens is not None:
+            params["max_tokens"] = max_tokens
+        if top_p is not None:
+            params["top_p"] = top_p
+    else:
+        params = prepare_params(
+            messages=messages,
+            model_name=model_name,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format=response_format,
+            tools=tools,
+            tool_choice=tool_choice,
+            api_key=api_key,
+            api_base=api_base,
+            stream=stream,
+            top_p=top_p,
+            model_id=model_id,
+            enable_thinking=enable_thinking,
+            reasoning_effort=reasoning_effort
+        )
+
+    # Unified retry logic for all providers
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
             logger.debug(f"Attempt {attempt + 1}/{MAX_RETRIES}")
-            # logger.debug(f"API request parameters: {json.dumps(params, indent=2)}")
-
+            logger.debug(f"API params: {params}")
             response = await litellm.acompletion(**params)
-            logger.debug(f"Successfully received API response from {model_name}")
-            logger.debug(f"Response: {response}")
+            logger.debug(f"Response received from {model_name}")
             return response
-
         except (litellm.exceptions.RateLimitError, OpenAIError, json.JSONDecodeError) as e:
             last_error = e
             await handle_error(e, attempt, MAX_RETRIES)
-
         except Exception as e:
-            logger.error(f"Unexpected error during API call: {str(e)}", exc_info=True)
+            logger.error(f"Unexpected error: {str(e)}", exc_info=True)
             raise LLMError(f"API call failed: {str(e)}")
 
-    error_msg = f"Failed to make API call after {MAX_RETRIES} attempts"
+    error_msg = f"Failed API call after {MAX_RETRIES} attempts"
     if last_error:
         error_msg += f". Last error: {str(last_error)}"
     logger.error(error_msg, exc_info=True)
@@ -393,12 +452,69 @@ async def test_bedrock():
         print(f"Error testing Bedrock: {str(e)}")
         return False
 
+async def test_ollama():
+    """Test the Ollama integration with a simple query."""
+    test_messages = [
+        {"role": "user", "content": "Hello, can you give me a quick test response?"}
+    ]
+
+    try:
+        # Test with Llama3 model
+        print("\n--- Testing Ollama Llama3 model ---")
+        response = await make_llm_api_call(
+            model_name="ollama/llama3",
+            messages=test_messages,
+            temperature=0.7,
+            max_tokens=100
+        )
+        print(f"Response: {response.choices[0].message.content}")
+        print(f"Model used: {response.model}")
+
+        # Test with Mistral model
+        print("\n--- Testing Ollama Mistral model ---")
+        response = await make_llm_api_call(
+            model_name="ollama/mistral",
+            messages=test_messages,
+            temperature=0.7,
+            max_tokens=100
+        )
+        print(f"Response: {response.choices[0].message.content}")
+        print(f"Model used: {response.model}")
+
+        return True
+    except Exception as e:
+        print(f"Error testing Ollama: {str(e)}")
+        return False
+    
+async def test_custom_api():
+    """Test the Custom API integration with a simple query."""
+    test_messages = [
+        {"role": "user", "content": "Hello, can you give me a quick test response?"}
+    ]
+
+    try:
+        print("\n--- Testing Custom API ---")
+        response = await make_llm_api_call(
+            model_name="custom/your-model",
+            messages=test_messages,
+            temperature=0.7,
+            max_tokens=100
+        )
+        print(f"Response: {response.choices[0].message.content}")
+        print(f"Model used: {response.model}")
+        return True
+    except Exception as e:
+        print(f"Error testing Custom API: {str(e)}")
+        return False
+
 if __name__ == "__main__":
     import asyncio
 
-    test_success = asyncio.run(test_bedrock())
+    # Run all tests
+    bedrock_success = asyncio.run(test_bedrock())
+    ollama_success = asyncio.run(test_ollama())
 
-    if test_success:
-        print("\n✅ integration test completed successfully!")
+    if bedrock_success and ollama_success:
+        print("\n✅ All integration tests completed successfully!")
     else:
-        print("\n❌ Bedrock integration test failed!")
+        print("\n❌ Some integration tests failed!")

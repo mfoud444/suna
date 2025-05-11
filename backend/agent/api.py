@@ -373,12 +373,12 @@ async def start_agent(
         raise HTTPException(status_code=500, detail="Agent API not initialized with instance ID")
 
     # Use model from config if not specified in the request
-    model_name = body.model_name
-    logger.info(f"Original model_name from request: {model_name}")
+    # model_name = body.model_name
+    # logger.info(f"Original model_name from request: {model_name}")
 
-    if model_name is None:
-        model_name = config.MODEL_TO_USE
-        logger.info(f"Using model from config: {model_name}")
+    # if model_name is None:
+    model_name = config.MODEL_TO_USE
+    logger.info(f"Using model from config: {model_name}")
 
     # Log the model name after alias resolution
     resolved_model = MODEL_NAME_ALIASES.get(model_name, model_name)

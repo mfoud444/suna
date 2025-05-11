@@ -191,3 +191,5 @@ supabase/.temp/storage-version
 
 
 .env.scripts
+server/.git
+trash
