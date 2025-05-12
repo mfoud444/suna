@@ -100,6 +100,23 @@ def prepare_params(
     reasoning_effort: Optional[str] = 'low'
 ) -> Dict[str, Any]:
     """Prepare parameters for the API call."""
+    # Deep copy messages to avoid modifying the original
+    messages = [msg.copy() for msg in messages]
+    
+    # Fix tool_calls format in messages
+    for msg in messages:
+        if 'tool_calls' in msg:
+            if isinstance(msg['tool_calls'], str):
+                # If tool_calls is a string, try to parse it as JSON
+                try:
+                    msg['tool_calls'] = json.loads(msg['tool_calls'])
+                except json.JSONDecodeError:
+                    # If parsing fails, remove the tool_calls field
+                    del msg['tool_calls']
+            elif not isinstance(msg['tool_calls'], list):
+                # If tool_calls is neither string nor list, remove it
+                del msg['tool_calls']
+
     params = {
         "model": model_name,
         "messages": messages,
@@ -181,11 +198,8 @@ def prepare_params(
     if model_name.startswith("ollama/"):
         logger.debug(f"Preparing Ollama parameters for model: {model_name}")
         
-        # Ollama models don't need API keys but might need custom options
         params["custom_llm_provider"] = "ollama"
-        # ollama_model_name = model_name.replace("ollama/", "")
-        # print(f"Ollama model name: {ollama_model_name}")
-        # params["model_name"]= ollama_model_name
+      
         params["api_base"] = config.OLLAMA_API_BASE
         print(f"Ollama API base: {config.OLLAMA_API_BASE}")
         
@@ -205,6 +219,8 @@ def prepare_params(
     # Apply Anthropic prompt caching (minimal implementation)
     # Check model name *after* potential modifications (like adding bedrock/ prefix)
     effective_model_name = params.get("model", model_name) # Use model from params if set, else original
+    
+    
     if "claude" in effective_model_name.lower() or "anthropic" in effective_model_name.lower():
         messages = params["messages"] # Direct reference, modification affects params
 
@@ -281,6 +297,13 @@ def prepare_params(
         params["temperature"] = 1.0 # Required by Anthropic when reasoning_effort is used
         logger.info(f"Anthropic thinking enabled with reasoning_effort='{effort_level}'")
 
+    # Add debug logging for tool_calls
+    for i, msg in enumerate(messages):
+        if 'tool_calls' in msg:
+            logger.debug(f"Message {i} tool_calls before processing: {msg['tool_calls']}")
+            if 'tool_calls' in msg:
+                logger.debug(f"Message {i} tool_calls after processing: {msg['tool_calls']}")
+
     return params
 async def make_llm_api_call(
     messages: List[Dict[str, Any]],
@@ -304,60 +327,24 @@ async def make_llm_api_call(
     logger.info(f"Making LLM API call to model: {model_name}")
     logger.info(f"📡 API Call: Using model {model_name}")
 
-    # Check if this is a custom API call (no prefix but custom base configured)
-    use_custom_api = (
-        not any(model_name.startswith(prefix) 
-        for prefix in ["openai/", "anthropic/", "groq/", "ollama/", "bedrock/", "openrouter/"]
-    ) and config.CUSTOM_API_BASE)
-
-    # Prepare parameters based on provider type
-    if model_name.startswith("ollama/"):
-        params = {
-            "model": model_name,
-            "messages": messages,
-            "stream": stream,
-            "custom_llm_provider": "ollama",
-            "api_base": config.OLLAMA_API_BASE 
-        }
-    elif use_custom_api or model_name.startswith("custom/"):
-        print(f" 📡 📡 📡 📡Custom API configuration: {model_name}")
-        # Custom API configuration
-        params = {
-            "model": model_name.replace("custom/", ""),  # Remove custom/ prefix
-            "messages": messages,
-            "stream": stream,
-            "custom_llm_provider": "openai",  # Treat as OpenAI-compatible
-            "api_base": config.CUSTOM_API_BASE,
-           "timeout": 60,  # Add timeout
-            "max_retries": 2,  # Add retries
-            "verify_ssl": False  
-        #     "api_key": api_key or config.CUSTOM_API_KEY
-        }
+   
+    params = prepare_params(
+        messages=messages,
+        model_name=model_name,
         
-        # Add standard parameters
-        if temperature is not None:
-            params["temperature"] = temperature
-        if max_tokens is not None:
-            params["max_tokens"] = max_tokens
-        if top_p is not None:
-            params["top_p"] = top_p
-    else:
-        params = prepare_params(
-            messages=messages,
-            model_name=model_name,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format=response_format,
-            tools=tools,
-            tool_choice=tool_choice,
-            api_key=api_key,
-            api_base=api_base,
-            stream=stream,
-            top_p=top_p,
-            model_id=model_id,
-            enable_thinking=enable_thinking,
-            reasoning_effort=reasoning_effort
-        )
+        temperature=temperature,
+        max_tokens=max_tokens,
+        response_format=response_format,
+        tools=tools,
+        tool_choice=tool_choice,
+        api_key=api_key,
+        api_base=api_base,
+        stream=stream,
+        top_p=top_p,
+        model_id=model_id,
+        enable_thinking=enable_thinking,
+        reasoning_effort=reasoning_effort
+    )
 
     # Unified retry logic for all providers
     last_error = None
